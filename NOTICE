@@ -1,0 +1,13 @@
+retool-to-next-skill
+
+Derivado de "retool-migration" (civitai/civitai, .claude/skills/retool-migration)
+Copyright 2022 Civitai
+https://github.com/civitai/civitai/tree/main/.claude/skills/retool-migration
+Licenciado sob Apache License 2.0 (ver LICENSE).
+
+Alterações feitas neste repositório:
+- SKILL.md reescrito em português; alvo trocado de SvelteKit (apps/moderator) para Next.js (App Router).
+- Removidas as partes específicas do civitai (moderator app, ClickUp, Discord, agentes de review, MIGRATIONS.md).
+- scripts/extract.mjs: copiado sem alteração de lógica.
+- scripts/retool-db.mjs: variável de ambiente renomeada para RETOOL_DATABASE_URL.
+- scripts/package.json e .env.example: renomeados/simplificados.
