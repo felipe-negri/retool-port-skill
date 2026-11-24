@@ -1,21 +1,21 @@
-# retool-to-next-skill
+# retool-port-skill
 
-Skill para agentes de código (Claude Code, Antigravity) que guia a migração de um app **Retool** para páginas **Next.js** (App Router): decodifica o export, inventaria queries e widgets, classifica tudo e orienta a reconstrução e a verificação.
+Skill para agentes de código (Claude Code, Antigravity) que guia a migração de um app **Retool** para código próprio, em **qualquer stack** (Next.js, SvelteKit, Nuxt, Remix, Rails…): decodifica o export, inventaria queries e widgets, classifica tudo e orienta a reconstrução e a verificação.
 
 ## Instalar
 
 ```bash
 # Claude Code
-git clone git@github.com:felipe-negri/retool-to-next-skill.git ~/.claude/skills/retool-to-next
+git clone git@github.com:felipe-negri/retool-port-skill.git ~/.claude/skills/retool-port
 # Antigravity (workspace)
-git clone git@github.com:felipe-negri/retool-to-next-skill.git <projeto>/.agent/skills/retool-to-next
+git clone git@github.com:felipe-negri/retool-port-skill.git <projeto>/.agent/skills/retool-port
 
 cd <pasta-clonada>/scripts && npm install
 ```
 
 ## Usar
 
-Passe o export JSON do Retool ao agente e peça: *"porte este app usando a skill retool-to-next"*.
+Passe o export JSON do Retool ao agente e peça: *"porte este app usando a skill retool-port"*.
 O fluxo está em [`SKILL.md`](SKILL.md): convenções do projeto → inventário → classificação de toda query → mapeamento de resources → construção → verificação de cobertura e fidelidade.
 
 ## Scripts (`scripts/`)

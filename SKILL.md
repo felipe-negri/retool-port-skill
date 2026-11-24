@@ -1,12 +1,12 @@
 ---
-name: retool-to-next
-description: Migrar um app Retool para páginas Next.js (App Router). Usar quando receber um export JSON do Retool (ou pedido para substituir/migrar uma ferramenta interna do Retool) e for preciso reconstruir a funcionalidade num app Next. Decodifica o export, inventaria queries/widgets, classifica tudo e guia a reconstrução.
+name: retool-port
+description: Migrar um app Retool para código próprio em qualquer stack (Next.js, SvelteKit, Nuxt, Remix, Rails, Django…). Usar quando receber um export JSON do Retool (ou pedido para substituir/migrar uma ferramenta interna do Retool). Decodifica o export, inventaria queries/widgets, classifica tudo e guia a reconstrução na stack do projeto-alvo.
 ---
 
-# Retool → Next.js
+# Retool → código próprio (qualquer stack)
 
 Porta o que o app Retool **faz**, não o layout nem o estilo. O JSON é spec de comportamento, não de design.
-Adaptado da skill `retool-migration` do civitai (alvo original: SvelteKit); as partes específicas deles foram removidas.
+Adaptado da skill `retool-migration` do civitai (alvo original: SvelteKit); as partes específicas deles foram removidas. O método e os scripts não dependem da stack: só o §4 (construir) varia, e ele se guia pelo projeto-alvo.
 
 ## Setup (uma vez)
 
@@ -16,11 +16,10 @@ cd <pasta-da-skill>/scripts && npm install   # pg + transit-js
 
 O export **não é JSON puro**: `page.data.appState` é string **transit-js**. Não tente ler o arquivo cru; use `extract.mjs`.
 
-## 0. Descobrir as convenções do projeto-alvo (antes de qualquer código)
+## 0. Descobrir a stack e as convenções do projeto-alvo (antes de qualquer código)
 
-Não assuma stack. Leia no repo Next: router (app/ vs pages/), ORM/query builder (Prisma, Drizzle, Kysely…),
-lib de UI (shadcn/Tailwind?), auth/roles, padrão de mutação (Server Actions vs route handlers) e CLAUDE.md/AGENTS.md.
-Siga o que já existe; se faltar algo decisivo (auth, onde fica o DB), **pergunte**.
+Não assuma stack. Leia o repo-alvo: framework e roteamento, ORM/query builder, lib de UI, auth/roles, padrão de mutação e CLAUDE.md/AGENTS.md.
+Siga o que já existe; se faltar algo decisivo (auth, onde fica o DB), **pergunte**. Se não houver projeto ainda, pergunte qual stack usar (a skill funciona igual).
 
 ## 1. Inventariar
 
@@ -81,23 +80,33 @@ node scripts/retool-db.mjs 'SELECT * FROM "<Tabela>" LIMIT 5'
 Somente leitura: escritas são recusadas antes de conectar. Credencial vem do cofre/Vault da void, nunca hardcoded.
 Colunas de autoria (`createdBy`, `updatedBy`) costumam ser texto livre com *nome de exibição*; grave o username do usuário logado e deixe o mapeamento para id como follow-up.
 
-## 4. Construir
+## 4. Construir (na stack do projeto)
 
-- **Rota**: `app/<área>/<slug>/page.tsx` (Server Component carrega dados via serviço) + componentes client só onde há interação.
-- **Dados**: serviço em `lib/server/<dominio>.ts`; query builder por padrão, SQL cru só p/ bitmask, funções PG, jsonb/LATERAL.
-- **Mutações**: Server Actions (ou route handlers) → mesma camada de serviço; validar input (zod) no limite; `revalidatePath` após escrever.
-- **Filtros**: a query string é a fonte da verdade (`searchParams`), nunca estado local.
-- **Layout**: container com várias panes = **sub-rotas, uma por pane** (`[tab]`), não uma página longa. Modal = dialog. Pane com `only visible when` é **gate de role/estado que não aparece em nenhuma query** — porte o gate (middleware/checagem server-side, não só esconder no client).
-- **Leituras de investigação** devem usar a réplica de leitura, se existir; `write` só com motivo escrito.
+Princípios, valem em qualquer stack:
+- **Serviço no servidor**: dados e regras numa camada de serviço; a página só chama o serviço. Query builder por padrão, SQL cru só p/ bitmask, funções do banco, jsonb/LATERAL.
+- **Mutações** pela camada de serviço, com validação de input no limite (zod/pydantic/etc.) e revalidação/refresh da view depois de escrever.
+- **Filtros na URL** (query string é a fonte da verdade), nunca estado local.
+- **Layout**: container com várias panes = **uma sub-rota por pane**, não uma página longa. Modal = dialog. Pane com `only visible when` é **gate de role/estado que não aparece em nenhuma query**: porte-o checando no servidor, não só escondendo no client.
+- **Leituras de investigação** na réplica de leitura, se existir; escrita só com motivo escrito.
 - Mantenha os nomes das queries do Retool (`GetHelpers`, `GetImageData`) em nomes de funções: é como o time as chama.
-- Registrar a rota na navegação/permissões do app e avisar o usuário se o acesso depende de grant manual.
+- Registrar a rota na navegação/permissões do app e avisar se o acesso depende de grant manual.
+
+Onde cada conceito costuma morar (use o que o projeto já faz; isto é só referência):
+
+| Conceito | Next.js (App Router) | SvelteKit | Nuxt | Remix / React Router | Rails / Django |
+| --- | --- | --- | --- | --- | --- |
+| Rota + dados | `page.tsx` (Server Component) | `+page.server.ts` `load` | `pages/` + `useAsyncData` | `loader` | controller/view |
+| Mutação | Server Action / route handler | form action | `server/api` | `action` | controller/view POST |
+| Filtros | `searchParams` | `url.searchParams` | `useRoute().query` | `useSearchParams` | params |
+| Sub-rotas (abas) | `[tab]/page.tsx` | `[tab]/+page.svelte` | `[tab].vue` | rota aninhada | nested routes |
+| Gate de role | middleware + checagem no serviço | `hooks.server` + `load` | middleware server | `loader` | before_action / permission |
 
 ## 5. Verificar (gate, não formalidade)
 
 1. **Cobertura**: releia a classificação do §2 contra o que foi construído; toda query tem que estar contabilizada.
 2. **Ser NOMEADA não é ser COBERTA.** Para cada query leia o **corpo SQL**: o que o WHERE filtra, que colunas seleciona, de onde vem o input. Uma query cujo input é um widget que você não construiu não foi portada, mesmo mapeada para um endpoint (exemplos reais: query que listava itens *já removidos* = o workflow inteiro de restauração; entrada por "lista colada de ids" perdida; um "nukeUser" que só removia imagens mapeado para um "purge all" de blast radius maior).
 3. **Fidelidade**: percorra o export query por query e confira se o comportamento existe e bate. Revisões de código comparam o código a ele mesmo e **não abrem o export** — passam limpas sobre uma implementação fiel da coisa errada. Verifique as alegações do review contra o inventário antes de agir.
-4. Rodar typecheck, lint e build do projeto.
+4. Rodar typecheck, lint e os testes do projeto (os comandos do próprio repo).
 5. Lacunas que só screenshot fecha: **handlers de evento** (o que cada clique dispara) e **widgets de nível de frame** (toolbar persistente fora do container) não existem no export. Peça screenshots/acesso ao app vivo.
 
 ## Gotchas
